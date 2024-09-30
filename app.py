@@ -11,8 +11,8 @@ from tensorflow.keras import backend as K
 # Set up environment for Keras
 os.environ["SM_FRAMEWORK"] = "tf.keras"
 
-# Load the model
-weights = [0.1666, 0.1666, 0.1666, 0.1666, 0.1666, 0.1666]
+# Load the model with error handling
+weights = [0.1666] * 6
 dice_loss = sm.losses.DiceLoss(class_weights=weights)
 focal_loss = sm.losses.CategoricalFocalLoss()
 total_loss = dice_loss + (1 * focal_loss)
@@ -29,7 +29,13 @@ custom_objects = {
     "jacard_coef": jacard_coef
 }
 
-model = load_model(model_path, custom_objects=custom_objects)
+# Attempt to load the model
+try:
+    model = load_model(model_path, custom_objects=custom_objects)
+    st.write("Model loaded successfully!")
+except Exception as e:
+    st.error(f"Error loading model: {e}")
+    st.stop()  # Stop the app if the model cannot be loaded
 
 # Streamlit app
 st.title("Satellite Image Segmentation")
@@ -45,7 +51,7 @@ if uploaded_file is not None:
     test_img = np.array(test_img)
 
     # Prepare the image for the model
-    test_img_input = np.expand_dims(test_img, 0)
+    test_img_input = np.expand_dims(test_img, axis=0)
 
     # Make the prediction
     prediction = model.predict(test_img_input)
