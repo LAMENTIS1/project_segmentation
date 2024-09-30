@@ -1,87 +1,65 @@
-import streamlit as st
-import tensorflow as tf
+import os
 import numpy as np
-from tensorflow.keras.preprocessing import image
 import matplotlib.pyplot as plt
-import io
+import streamlit as st
 from PIL import Image
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+import segmentation_models as sm
+from tensorflow.keras import backend as K
 
-# Constants
-MODEL_PATH = 'model/satellite_standard_unet_100epochs.hdf5'  # Updated model path in the "model" folder
-IMG_HEIGHT = 256  # Set according to your model's expected input size
-IMG_WIDTH = 256   # Set according to your model's expected input size
+# Set up environment for Keras
+os.environ["SM_FRAMEWORK"] = "tf.keras"
 
-# Load model
-@st.cache_resource
-def load_model():
-    try:
-        # Using tf.keras.models.load_model('model path')
-        model = tf.keras.models.load_model(MODEL_PATH)
-        st.success("Model loaded successfully!")
-        return model
-    except FileNotFoundError:
-        st.error(f"Model file not found at {MODEL_PATH}. Please check the file path.")
-        return None
-    except IOError as e:
-        st.error(f"IOError while loading the model: {e}")
-        return None
-    except Exception as e:
-        st.error(f"Unexpected error loading model: {e}")
-        return None
+# Load the model
+weights = [0.1666, 0.1666, 0.1666, 0.1666, 0.1666, 0.1666]
+dice_loss = sm.losses.DiceLoss(class_weights=weights)
+focal_loss = sm.losses.CategoricalFocalLoss()
+total_loss = dice_loss + (1 * focal_loss)
 
-model = load_model()
+def jacard_coef(y_true, y_pred):
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f)
+    return (intersection + 1.0) / (K.sum(y_true_f) + K.sum(y_pred_f) - intersection + 1.0)
 
-# Color map for segmentation mask
-def get_color_map(num_classes):
-    color_map = plt.get_cmap("hsv", num_classes)
-    return color_map
+model_path = "model/satellite_standard_unet_100epochs.hdf5"
+custom_objects = {
+    "dice_loss_plus_1focal_loss": total_loss,
+    "jacard_coef": jacard_coef
+}
 
-# Preprocess the image
-def load_and_preprocess_image(uploaded_file):
-    img = Image.open(uploaded_file)
-    img = img.resize((IMG_HEIGHT, IMG_WIDTH))
-    img_array = np.array(img)
-    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
-    img_array = img_array / 255.0  # Normalize if required
-    return img_array
+model = load_model(model_path, custom_objects=custom_objects)
 
-# Make prediction
-def make_prediction(uploaded_file):
-    processed_img = load_and_preprocess_image(uploaded_file)
-    predictions = model.predict(processed_img)
+# Streamlit app
+st.title("Satellite Image Segmentation")
 
-    # Assuming multi-class segmentation, get the class with the highest score
-    predicted_mask = np.argmax(predictions[0], axis=-1).astype(np.uint8)
-
-    return predicted_mask
-
-# Color the predicted mask
-def colorize_mask(mask, num_classes):
-    color_map = get_color_map(num_classes)
-    color_mask = color_map(mask)
-    return (color_mask[:, :, :3] * 255).astype(np.uint8)  # Convert to uint8
-
-# Streamlit app layout
-st.title("Semantic Segmentation using UNet")
-st.header("Upload an image to predict the segmentation mask")
-
-# Image uploader
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+# File uploader
+uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+    # Load and process the image
+    test_img = Image.open(uploaded_file)
+    desired_width, desired_height = 256, 256
+    test_img = test_img.resize((desired_width, desired_height))
+    test_img = np.array(test_img)
+
+    # Prepare the image for the model
+    test_img_input = np.expand_dims(test_img, 0)
+
+    # Make the prediction
+    prediction = model.predict(test_img_input)
+    predicted_img = np.argmax(prediction, axis=3)[0, :, :]
+
+    # Plotting the images
+    fig, ax = plt.subplots(1, 2, figsize=(12, 8))
     
-    # Predict button
-    if st.button("Predict"):
-        if model is not None:
-            # Make the prediction
-            predicted_mask = make_prediction(uploaded_file)
-            
-            # Colorize the predicted mask
-            colored_mask = colorize_mask(predicted_mask, num_classes=6)  # Change 6 to your actual number of classes
-            
-            # Display results
-            st.subheader("Predicted Segmentation Mask")
-            st.image(colored_mask, caption="Predicted Mask", use_column_width=True)
-        else:
-            st.error("Model is not loaded. Please check the model path.")
+    ax[0].imshow(test_img)
+    ax[0].set_title('Testing Image')
+    ax[0].axis('off')
+
+    ax[1].imshow(predicted_img)
+    ax[1].set_title('Prediction on Test Image')
+    ax[1].axis('off')
+
+    st.pyplot(fig)
