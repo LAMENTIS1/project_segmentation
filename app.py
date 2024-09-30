@@ -7,7 +7,7 @@ import io
 from PIL import Image
 
 # Constants
-MODEL_PATH = 'model/satellite_standard_unet_100epochs.hdf5'
+MODEL_PATH = 'model/satellite_standard_unet_100epochs.hdf5'  # Updated model path in the "model" folder
 IMG_HEIGHT = 256  # Set according to your model's expected input size
 IMG_WIDTH = 256   # Set according to your model's expected input size
 
@@ -15,10 +15,18 @@ IMG_WIDTH = 256   # Set according to your model's expected input size
 @st.cache_resource
 def load_model():
     try:
+        # Using tf.keras.models.load_model('model path')
         model = tf.keras.models.load_model(MODEL_PATH)
+        st.success("Model loaded successfully!")
         return model
+    except FileNotFoundError:
+        st.error(f"Model file not found at {MODEL_PATH}. Please check the file path.")
+        return None
+    except IOError as e:
+        st.error(f"IOError while loading the model: {e}")
+        return None
     except Exception as e:
-        st.error(f"Error loading model: {e}")
+        st.error(f"Unexpected error loading model: {e}")
         return None
 
 model = load_model()
