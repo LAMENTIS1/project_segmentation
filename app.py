@@ -7,7 +7,7 @@ import io
 from PIL import Image
 
 # Constants
-MODEL_PATH = 'satellite_standard_unet_100epochs.hdf5'
+MODEL_PATH = 'model/satellite_standard_unet_100epochs.hdf5'
 IMG_HEIGHT = 256  # Set according to your model's expected input size
 IMG_WIDTH = 256   # Set according to your model's expected input size
 
