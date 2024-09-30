@@ -64,7 +64,7 @@ if uploaded_file is not None:
     ax[0].set_title('Testing Image')
     ax[0].axis('off')
 
-    ax[1].imshow(predicted_img)
+    ax[1].imshow(predicted_img, cmap='jet')  # Use a colormap for better visualization
     ax[1].set_title('Prediction on Test Image')
     ax[1].axis('off')
 
