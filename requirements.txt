@@ -1,6 +1,7 @@
-streamlit
 tensorflow
-numpy
+segmentation-models
+streamlit
 Pillow
+numpy
 matplotlib
 gunicorn 
