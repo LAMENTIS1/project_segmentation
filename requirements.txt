@@ -4,4 +4,5 @@ streamlit
 Pillow
 numpy
 matplotlib
+keras
 gunicorn 
